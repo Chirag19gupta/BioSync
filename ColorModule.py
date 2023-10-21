@@ -1,64 +1,50 @@
-"""
-Color Module
-Finds color in an image based on hsv values
-Can run as stand alone to find relevant hsv values
-
-"""
-
 import cv2
 import numpy as np
 import logging
 
 
-
 class ColorFinder:
-    def _init_(self, trackBar=False):
+    def __init__(self, trackBar=False):
         self.trackBar = trackBar
         if self.trackBar:
             self.initTrackbars()
+
+        # Define the dictionary of color ranges in HSV
+        self.color_ranges = {
+            'red': [{'hmin': 0, 'smin': 120, 'vmin': 70, 'hmax': 10, 'smax': 255, 'vmax': 255},
+                    {'hmin': 170, 'smin': 120, 'vmin': 70, 'hmax': 180, 'smax': 255, 'vmax': 255}],
+            # red has two ranges
+            'orange': [{'hmin': 10, 'smin': 100, 'vmin': 20, 'hmax': 25, 'smax': 255, 'vmax': 255}],
+            'yellow': [{'hmin': 25, 'smin': 100, 'vmin': 20, 'hmax': 35, 'smax': 255, 'vmax': 255}],
+            'green': [{'hmin': 35, 'smin': 100, 'vmin': 20, 'hmax': 85, 'smax': 255, 'vmax': 255}],
+            'blue': [{'hmin': 85, 'smin': 100, 'vmin': 20, 'hmax': 125, 'smax': 255, 'vmax': 255}],
+            'indigo': [{'hmin': 125, 'smin': 100, 'vmin': 20, 'hmax': 135, 'smax': 255, 'vmax': 255}],
+            'violet': [{'hmin': 135, 'smin': 100, 'vmin': 20, 'hmax': 170, 'smax': 255, 'vmax': 255}],
+            'white': [{'hmin': 0, 'smin': 0, 'vmin': 200, 'hmax': 180, 'smax': 55, 'vmax': 255}]
+        }
 
     def empty(self, a):
         pass
 
     def initTrackbars(self):
-        """
-        To intialize Trackbars . Need to run only once
-        """
-        cv2.namedWindow("TrackBars")
-        cv2.resizeWindow("TrackBars", 640, 240)
-        cv2.createTrackbar("Hue Min", "TrackBars", 0, 179, self.empty)
-        cv2.createTrackbar("Hue Max", "TrackBars", 179, 179, self.empty)
-        cv2.createTrackbar("Sat Min", "TrackBars", 0, 255, self.empty)
-        cv2.createTrackbar("Sat Max", "TrackBars", 255, 255, self.empty)
-        cv2.createTrackbar("Val Min", "TrackBars", 0, 255, self.empty)
-        cv2.createTrackbar("Val Max", "TrackBars", 255, 255, self.empty)
+        pass
+
+    # [Method to initialize trackbars, if used]
 
     def getTrackbarValues(self):
-        """
-        Gets the trackbar values in runtime
-        :return: hsv values from the trackbar window
-        """
-        hmin = cv2.getTrackbarPos("Hue Min", "TrackBars")
-        smin = cv2.getTrackbarPos("Sat Min", "TrackBars")
-        vmin = cv2.getTrackbarPos("Val Min", "TrackBars")
-        hmax = cv2.getTrackbarPos("Hue Max", "TrackBars")
-        smax = cv2.getTrackbarPos("Sat Max", "TrackBars")
-        vmax = cv2.getTrackbarPos("Val Max", "TrackBars")
+        pass
 
-        hsvVals = {"hmin": hmin, "smin": smin, "vmin": vmin,
-                   "hmax": hmax, "smax": smax, "vmax": vmax}
-        print(hsvVals)
-        return hsvVals
+    # [Method to get trackbar values, if used]
+
+    def getColorHSV(self, myColor):
+        return self.color_ranges.get(myColor, None)
+
+    def calculate_area_of_color(self, mask):
+        return cv2.countNonZero(mask)
 
     def update(self, img, myColor=None):
-        """
-        :param img: Image in which color needs to be found
-        :param hsvVals: List of lower and upper hsv range
-        :return: (mask) bw image with white regions where color is detected
-                 (imgColor) colored image only showing regions detected
-        """
-        imgColor = [],
-        mask = []
+        imgColor = None
+        mask = None
 
         if self.trackBar:
             myColor = self.getTrackbarValues()
@@ -67,50 +53,64 @@ class ColorFinder:
             myColor = self.getColorHSV(myColor)
 
         if myColor is not None:
-            imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-            lower = np.array([myColor['hmin'], myColor['smin'], myColor['vmin']])
-            upper = np.array([myColor['hmax'], myColor['smax'], myColor['vmax']])
-            mask = cv2.inRange(imgHSV, lower, upper)
+            for color_range in myColor:  # updated to handle multiple ranges per color
+                imgHSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                lower = np.array([color_range['hmin'], color_range['smin'], color_range['vmin']])
+                upper = np.array([color_range['hmax'], color_range['smax'], color_range['vmax']])
+                current_mask = cv2.inRange(imgHSV, lower, upper)
+
+                if mask is None:
+                    mask = current_mask
+                else:
+                    mask = cv2.bitwise_or(mask, current_mask)  # Combine masks if there are multiple ranges
+
             imgColor = cv2.bitwise_and(img, img, mask=mask)
+
         return imgColor, mask
-
-    def getColorHSV(self, myColor):
-
-        if myColor == 'red':
-            output = {'hmin': 146, 'smin': 141, 'vmin': 77, 'hmax': 179, 'smax': 255, 'vmax': 255}
-        elif myColor == 'green':
-            output = {'hmin': 44, 'smin': 79, 'vmin': 111, 'hmax': 79, 'smax': 255, 'vmax': 255}
-        elif myColor == 'blue':
-            output = {'hmin': 103, 'smin': 68, 'vmin': 130, 'hmax': 128, 'smax': 255, 'vmax': 255}
-        else:
-            output = None
-            logging.warning("Color Not Defined")
-            logging.warning("Available colors: red, green, blue ")
-
-        return output
 
 
 def main():
-    myColorFinder = ColorFinder(False)
+    useTrackBar = False  # Change to True if you want to use trackbars
+    myColorFinder = ColorFinder(useTrackBar)
+
     cap = cv2.VideoCapture(0)
     cap.set(3, 640)
     cap.set(4, 480)
 
-    # Custom Orange Color
-    hsvVals = {'hmin': 10, 'smin': 55, 'vmin': 215, 'hmax': 42, 'smax': 255, 'vmax': 255}
-
     while True:
         success, img = cap.read()
-        imgRed, _ = myColorFinder.update(img, "red")
-        imgGreen, _ = myColorFinder.update(img, "green")
-        imgBlue, _ = myColorFinder.update(img, "blue")
-        imgOrange, _ = myColorFinder.update(img, hsvVals)
+        if not success:
+            logging.error("Failed to read frame. Exiting...")
+            break
 
-        cv2.imshow("Red", imgRed)
-        cv2.imshow("Image", img)
+        combined_image = np.zeros_like(img)
+        color_areas = {}
+
+        for color in myColorFinder.color_ranges.keys():  # Using the colors from the dictionary
+            imgColor, mask = myColorFinder.update(img, color)
+            combined_image = cv2.addWeighted(combined_image, 1, imgColor, 1, 0)
+
+            color_area = myColorFinder.calculate_area_of_color(mask)
+            color_areas[color] = color_area
+
+        # Determine the color with the maximum area
+        predominant_color = max(color_areas, key=color_areas.get)
+
+        # Create a text to display
+        text = f"Predominant color: {predominant_color}"
+
+        # Put the text on the combined image
+        cv2.putText(combined_image, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+        cv2.imshow("Detected Colors", combined_image)
+        cv2.imshow("Original Image", img)
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    cap.release()
+    cv2.destroyAllWindows()
 
-if __name__ == "_main_":
+
+if __name__ == "__main__":
     main()
