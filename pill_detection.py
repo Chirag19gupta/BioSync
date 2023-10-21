@@ -1,74 +1,63 @@
 import cv2
-import cvzone
 import numpy as np
 
-# Create a VideoCapture object for the default camera (0) or specify your camera index
-camera_index = 1  # Change this to your camera index if needed
-
+# Function for trackbar control
 def empty(a):
     pass
 
+# Create settings window for trackbars
 cv2.namedWindow("Settings")
 cv2.resizeWindow("Settings", 640, 240)
-cv2.createTrackbar("Threshold1", "Settings", 255, 255, empty)
-cv2.createTrackbar("Threshold2", "Settings", 120, 255, empty)
+cv2.createTrackbar("Threshold1", "Settings", 23, 255, empty)  # Adjusted from 255 to start
+cv2.createTrackbar("Threshold2", "Settings", 20, 255, empty)  # Adjusted from 120 to start
 
+# Image preprocessing for edge detection
 def preProcessing(img):
-    imgPre = cv2.GaussianBlur(img, (5, 5), 3)
+    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Convert image to grayscale
+    imgBlur = cv2.GaussianBlur(imgGray, (5, 5), 1)  # Add Gaussian Blur
     thresh1 = cv2.getTrackbarPos("Threshold1", "Settings")
     thresh2 = cv2.getTrackbarPos("Threshold2", "Settings")
-    imgPre = cv2.Canny(imgPre, thresh1, thresh2)
-    kernel = np.ones((2, 2), np.uint8)
-    imgPre = cv2.dilate(imgPre, kernel, iterations=1)
-    imgPre = cv2.morphologyEx(imgPre, cv2.MORPH_CLOSE, kernel)
-    return imgPre
+    imgCanny = cv2.Canny(imgBlur, thresh1, thresh2)  # Canny Edge detection
+    kernel = np.ones((5, 5))
+    imgDil = cv2.dilate(imgCanny, kernel, iterations=2)  # Dialation
+    imgThres = cv2.erode(imgDil, kernel, iterations=1)  # Erosion
+    return imgThres
 
-# Create a VideoCapture object with the desired camera index
-cap = cv2.VideoCapture(camera_index)
-
-# Check if the camera is opened successfully
+# Start video capture
+cap = cv2.VideoCapture(1)
 if not cap.isOpened():
     print("Error: Unable to open the camera.")
     exit()
 
-totalTablets = 0
-
 while True:
     success, img = cap.read()
-
     if not success:
         print("Error: Failed to capture a frame.")
         break
 
     imgPre = preProcessing(img)
-    imgContours, conFound = cvzone.findContours(img, imgPre, minArea=20)
+    contours, hierarchy = cv2.findContours(imgPre, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     totalTablets = 0
 
-    if conFound:
-        for count, contour in enumerate(conFound):
-            peri = cv2.arcLength(contour['cnt'], True)
-            approx = cv2.approxPolyDP(contour['cnt'], 0.02 * peri, True)
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if 1000 < area < 10000:  # You might need to adjust these values based on your actual tablet size
+            totalTablets += 1
+            peri = cv2.arcLength(cnt, True)
+            approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+            x, y, w, h = cv2.boundingRect(approx)
+            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)  # Draw a green rectangle around the detected object
 
-            if len(approx) > 5:
-                area = contour['area']
+    # Display the tablet count on the image frame
+    cv2.putText(img, f'Tablets: {totalTablets}', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-                if 4400 < area < 5500:
-                    totalTablets += 1
+    # Show the image
+    cv2.imshow("Image", img)
 
-                x, y, w, h = contour['bbox']
-                imgCrop = img[y:y + h, x:x + w]
-                cv2.imshow(str(count), imgCrop)
-
-    print(totalTablets)
-    imgStacked = cvzone.stackImages([img, imgPre, imgContours], 2, 1)
-    cvzone.putTextRect(imgStacked, f'Tablets: {totalTablets}', (50, 50))
-
-    cv2.imshow("Image", imgStacked)
-
-    # Press 'q' to exit the loop
+    # Break the loop if 'q' is pressed
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Release the camera and close all OpenCV windows
+# Clean up
 cap.release()
 cv2.destroyAllWindows()
