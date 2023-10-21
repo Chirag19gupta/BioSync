@@ -1,4 +1,4 @@
-#MediMorph-DataZtroopers
+# MediMorph-DataZtroopers
 This project will be useful in detecting the medicines and also it will be telling the alternatives of the medicine and their dosage and pricing and also the salts present in the medicine. 
 
 Installation
